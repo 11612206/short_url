@@ -1,9 +1,14 @@
 from flask import Flask,request,render_template,redirect
+from wtforms import Form, FloatField
 from flask_sqlalchemy import SQLAlchemy
 from urllib.parse import urlparse,parse_qs,parse_qsl
+import hashlib
 
 # initialise app
 app=Flask(__name__)
+
+#create md5 object
+md5 = hashlib.md5()
 
 # set up database
 ENV='dev'
@@ -42,17 +47,17 @@ def index():
     return 
 
 # processing users' input, generate MD5 hash and write in db
-@app.route("/submit")
+#Xinjie, here I use wtforms instead of request. I can change if you want or some error occurs during next step
+@app.route("/submit", method='POST')
 def submit():
-
-    # @xinyao, please let us keep things aligned:
-    # 1. logic of generating hash: extract the host (i.e. domain name), path from input url, can reference
-    # functions in urllib package
-    # then convert the path into hash.
-    # 2. input variables' names aligned: url, host, path, hash
-
-    # parse url and generate hash
-
+    
+    #get url
+    url = request.form.get("url")
+    url = urlparse(url)
+    host = url.netloc
+    path = url.path
+    hash = get_md5(path)
+    new_url= host + '/'+ hash
 
     # write into database
     data=Short_url(url,host,path,hash)
@@ -60,7 +65,17 @@ def submit():
     db.session.add(data)
     db.session.commit()
 
-    return # can return a success page or simply a message
+    return render_template("submit.html", s=new_url)
+
+# @Xinjie, one problem here is that md5 hash generate 128-bit hash output(16 digits), not the same as the example from Justin
+# the 6 digit shorten form cannot be achieved using hash, normally we need to design our own transformation method
+# I will drop him an email to discuss about this
+
+#MD5 hash
+def get_md5(path):
+    md5.update(path.encode(encoding='utf-8'))
+    return md5.hexdigest()
+
 
 # identify users shorten url input and redirect
 @app.route("/access/<path:short_url>")
